@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Cold Drinks Trend Analyse</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 40px; background-color: #f0f2f5; color: #333; }
+        .container { max-width: 1000px; margin: auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+        h1 { color: #1a73e8; border-bottom: 2px solid #e8eaed; padding-bottom: 10px; }
+        .ai-section { background-color: #e8f0fe; border-left: 6px solid #1a73e8; padding: 20px; margin: 20px 0 40px 0; border-radius: 4px; }
+        .chart-container { position: relative; margin-bottom: 50px; height: 400px; }
+        .error { color: #d93025; background: #fce8e6; padding: 10px; border-radius: 4px; display: none; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🥤 Cold Drinks Trend Dashboard</h1>
+
+    <div id="error-msg" class="error"></div>
+
+    <div class="ai-section">
+        <h3>🤖 KI-Interpretation</h3>
+        <p id="ai-text">Analysiere Daten, bitte warten...</p>
+    </div>
+
+    <div class="chart-container">
+        <h3>📊 Durchschnittliches Interesse (Mean)</h3>
+        <canvas id="barChart"></canvas>
+    </div>
+
+    <div class="chart-container">
+        <h3>🔝 Peak Interesse pro Getränk (Max)</h3>
+        <canvas id="pieChart"></canvas>
+    </div>
+</div>
+
+<script>
+    async function fetchData() {
+        try {
+            const response = await fetch('/analyze');
+            const data = await response.json();
+
+            if (data.error) {
+                document.getElementById('error-msg').innerText = "Fehler: " + data.error;
+                document.getElementById('error-msg').style.display = 'block';
+                return;
+            }
+
+            // KI Text einfügen
+            document.getElementById('ai-text').innerText = data.ki_analyse;
+
+            // Daten für Charts vorbereiten
+            const labels = Object.keys(data.verarbeitete_daten);
+            const means = labels.map(key => data.verarbeitete_daten[key].mean);
+            const peaks = labels.map(key => data.verarbeitete_daten[key].peak);
+
+            // Chart 1: Balkendiagramm
+            new Chart(document.getElementById('barChart'), {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Interesse (Ø)',
+                        data: means,
+                        backgroundColor: '#4285f4'
+                    }]
+                },
+                options: { maintainAspectRatio: false }
+            });
+
+            // Chart 2: Doughnut Chart
+            new Chart(document.getElementById('pieChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: peaks,
+                        backgroundColor: ['#db4437', '#4285f4', '#f4b400', '#0f9d58', '#ab47bc']
+                    }]
+                },
+                options: { maintainAspectRatio: false }
+            });
+
+        } catch (err) {
+            console.error(err);
+            document.getElementById('ai-text').innerText = "Verbindung zum AI-Service fehlgeschlagen.";
+        }
+    }
+
+    fetchData();
+</script>
+
+</body>
+</html>

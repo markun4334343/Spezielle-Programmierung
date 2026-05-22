@@ -1,0 +1,17 @@
+services:
+  data-service:
+    build: ./data_service
+    ports:
+      - "5001:5001"
+    volumes:
+      - ./data:/app/data  # Mountet deinen lokalen data-Ordner in den Container
+
+  ai-service:
+    build: ./ai_service
+    ports:
+      - "5002:5002"
+    environment:
+      - DATA_SERVICE_URL=http://data-service:5001/api/stats
+      - AI_API_KEY=DEIN_ECHTER_KEY_HIER
+    depends_on:
+      - data-service
