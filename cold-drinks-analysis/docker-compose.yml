@@ -4,7 +4,7 @@ services:
     ports:
       - "5001:5001"
     volumes:
-      - ./data:/app/data  # Mountet deinen lokalen data-Ordner in den Container
+      - ./data:/app/data  # Mountet den data-Ordner direkt nach /app/data im Container
 
   ai-service:
     build: ./ai_service
@@ -12,6 +12,7 @@ services:
       - "5002:5002"
     environment:
       - DATA_SERVICE_URL=http://data-service:5001/api/stats
-      - AI_API_KEY=DEIN_ECHTER_KEY_HIER
+      - AI_API_KEY=sk-d14d57adef31432f888f312aa56c51ef
+      - AI_BASE_URL=https://api.deepseek.com/v1  # Wichtig, falls dein Key von DeepSeek ist!
     depends_on:
       - data-service

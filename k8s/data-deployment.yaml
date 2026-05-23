@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: data-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: data-service
+  template:
+    metadata:
+      labels:
+        app: data-service
+    spec:
+      containers:
+        - name: data-service
+          image: data-service:latest
+          imagePullPolicy: Never # Wichtig, wenn du das Image lokal baust (z.B. in Docker Desktop / Kind)
+          ports:
+            - containerPort: 5001
+          volumeMounts:
+            - name: data-volume
+              mountPath: /app/data
+      volumes:
+        - name: data-volume
+          hostPath:
+            path: /Pfad/zu/deinem/Projekt/data # ACHTUNG: Hier den absoluten Pfad zu deinem lokalen /data Ordner eintragen
+            type: Directory
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: data-service
+spec:
+  selector:
+    app: data-service
+  ports:
+    - protocol: TCP
+      port: 5001
+      targetPort: 5001

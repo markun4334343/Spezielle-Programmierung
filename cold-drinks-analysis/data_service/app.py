@@ -1,57 +1,72 @@
 from flask import Flask, jsonify
 import pandas as pd
 import os
+import glob
 
 app = Flask(__name__)
 
 @app.route('/api/stats', methods=['GET'])
 def get_stats():
-    # --- PFAD-LOGIK FIX ---
-    # Ermittle das Verzeichnis, in dem diese Datei liegt (data_service)
-    base_dir = os.path.dirname(os.path.abspath(__file__))
+    # 1. Pfad zum Daten-Ordner
+    if os.path.exists('/app/data'):
+        data_dir = '/app/data'
+    else:
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        data_dir = os.path.join(base_dir, '..', 'data')
 
-    # Navigiere einen Ordner hoch und dann in 'data'
-    file_path = os.path.join(base_dir, '..', 'data', 'time_series_DE_20260328-1313_20260428-1313.csv')
+    csv_files = glob.glob(os.path.join(data_dir, '*.csv'))
 
-    # Debugging-Ausgabe im Terminal
-    print(f"Suche Datei unter: {file_path}")
+    if not csv_files:
+        return jsonify({"error": "Keine CSV Dateien im data Ordner gefunden"}), 404
 
-    if not os.path.exists(file_path):
-        return jsonify({
-            "error": "CSV Datei nicht gefunden",
-            "gesuchter_pfad": file_path
-        }), 404
+    results = {}
 
-    try:
-        # CSV einlesen (Überspringe die erste Zeile von Google Trends)
-        df = pd.read_csv(file_path, skiprows=1)
+    # 2. Alle CSVs einlesen ohne strikte Filter
+    for file_path in csv_files:
+        try:
+            # Wir probieren skiprows=1. Wenn das schiefgeht, probieren wir skiprows=2
+            try:
+                df = pd.read_csv(file_path, skiprows=1)
+                if len(df.columns) < 2:
+                    df = pd.read_csv(file_path, skiprows=2)
+            except Exception:
+                continue
 
-        # Spaltennamen säubern (z.B. 'Eistee: (Deutschland)' -> 'Eistee')
-        df.columns = [col.split(':')[0] if ':' in col else col for col in df.columns]
+            # Wir überspringen einfach die allererste Spalte (Datum) und nehmen den Rest
+            for col in df.columns[1:]:
+                drink_name = str(col).split(':')[0].strip()
 
-        results = {}
-        # Berechne Kennzahlen für alle Spalten außer der ersten (Datum)
-        for col in df.columns[1:]:
-            # Sicherstellen, dass die Daten numerisch sind
-            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+                # Leere oder kaputte Spalten überspringen
+                if not drink_name or "Unnamed" in drink_name:
+                    continue
 
-            mean_val = df[col].mean()
-            max_val = df[col].max()
-            last_val = df[col].iloc[-1]
+                # Werte bereinigen (Google Trends <1 wird zu 0)
+                raw_values = df[col].astype(str).str.replace('<1', '0').str.replace(',', '.')
+                values = pd.to_numeric(raw_values, errors='coerce').fillna(0)
 
-            trend = "steigend" if last_val > mean_val else "fallend"
+                # Wenn keine echten Zahlen da sind, überspringen
+                if len(values) == 0:
+                    continue
 
-            results[col] = {
-                "mean": round(float(mean_val), 2),
-                "peak": int(max_val),
-                "trend": trend
-            }
+                mean_val = values.mean()
+                max_val = values.max()
+                last_val = values.iloc[-1]
 
-        return jsonify(results)
+                trend = "steigend" if last_val > mean_val else "fallend"
 
-    except Exception as e:
-        return jsonify({"error": f"Fehler beim Verarbeiten der CSV: {str(e)}"}), 500
+                results[drink_name] = {
+                    "mean": round(float(mean_val), 2),
+                    "peak": int(max_val),
+                    "trend": trend
+                }
+        except Exception as e:
+            print(f"Fehler bei Datei {file_path}: {e}")
+
+    # Falls wirklich gar nichts verarbeitet werden konnte
+    if not results:
+        return jsonify({"error": "Die CSV-Dateien konnten gelesen werden, aber es wurden keine passenden Getränkedaten gefunden."}), 500
+
+    return jsonify(results)
 
 if __name__ == '__main__':
-    # Starte den Service auf Port 5001
     app.run(host='0.0.0.0', port=5001, debug=True)
